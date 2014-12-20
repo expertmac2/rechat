@@ -8,7 +8,7 @@ var ReChat = {
   chatDisplayLimit: 1000,
   loadingDelay: 5000,
   nicknameColors: Please.make_color({ colors_returned: 50, saturation: 0.7 }),
-  defaultStreamDelay: 20, //default 17
+  defaultStreamDelay: 17,
 
   Browser: {
     Safari: 0,
@@ -129,6 +129,8 @@ ReChat.Playback.prototype._prepareInterface = function() {
   this._container = container;
   $('#page').append(container);
 
+  $('#watch-header').after('<div id="rechat-information" class="yt-card yt-card-has-padding">Video not playing...</div>');
+
   $('#right_close').click(function() {
     if (!$(this).hasClass('closed')) {
       container.hide();
@@ -157,9 +159,9 @@ ReChat.Playback.prototype._loadEmoticons = function() {
       }
     });
     if (that._messagesFinished) {
-		$("#yt-masthead-container").text("done loading!!");
+		that._hideStatusMessage();
 	} else {
-		$("#yt-masthead-container").text("emoticon loading has finished, but wait a little bit for messages to finish");
+		that._showStatusMessage('Emoticons done, waiting on Messages');
 	}
 	that._emotesFinished = true;
     console.log("[YL ReChat] Emotes have loaded!");
@@ -339,14 +341,14 @@ ReChat.Playback.prototype._appendMessage = function(msg) {
 ReChat.Playback.prototype._tick = function() {
 	var sub = ((this._pop.currentTime() * 1000) - (this._lastVideoTime * 1000));
 	if (sub > 6000 || sub < 0) {
-		console.log("time skipped 6 or more seconds or is in the negative, resyncing");
+		console.log("[YL ReChat] Resynchronization required, time has either skipped forward or backward.");
 		this._resync();
 	}
 	this._virtualTime.setMilliseconds(this._virtualTime.getMilliseconds() + sub);
 	//console.log((pop.currentTime() * 1000) + " " + (lastVideoTime * 1000));
 	this._lastVideoTime = this._pop.currentTime();
 
-	$("#yt-masthead-container").text("virtual time: " + this._virtualTime.toLocaleDateString() + " " + this._virtualTime.toLocaleTimeString() + " | " + sub + " | " + this._currentChatMessage);
+	$("#rechat-information").text("virtual time: " + this._virtualTime.toLocaleDateString() + " " + this._virtualTime.toLocaleTimeString() +  "  |  message #" + this._currentChatMessage);
 
 	while (this._doDatesMatch()) {
 		//console.log("[" + this._virtualTime + "] " + this._chatLog[this._currentChatMessage].sender + ": " + this._chatLog[this._currentChatMessage].message);
@@ -367,20 +369,23 @@ ReChat.Playback.prototype._doDatesMatch = function() {
 
 ReChat.Playback.prototype._resync = function() {
 	//console.log(this._pop.currentTime());
+	this._showStatusMessage('Resynchronizing the chat...');
 	var targetTime = new Date(this._startingVirtualTime.getTime() + (this._pop.currentTime() * 1000));
 	var chatLog = this._chatLog;
-	console.log("targetTime: " + targetTime);
+	console.log("[YL ReChat] Reynchronization started. Looking for messages past: " + targetTime);
 	for (i = 0; i < chatLog.length; i++) { // this may be /really/ inefficient.
 		var nextDate = new Date(chatLog[i].year, chatLog[i].month - 1, chatLog[i].day, chatLog[i].hours, chatLog[i].minutes, chatLog[i].seconds);
 		if (nextDate > targetTime) {
-			console.log("chosen " + i + ", " + nextDate);
+			console.log("[YL ReChat] Resync done, chosen message #" + i + ", which is at " + nextDate);
 			this._currentChatMessage = i;
 			this._appendMessage(this._formatInfoMessage("** Chat has been resynchronized **"));
+			this._hideStatusMessage();
 			return;
 		}
 	}
-	console.log("uh oh, couldn't find anything when resyncing!!");
-	$("#yt-masthead-container").text("there was nothing found when resyncing chat... maybe try again by refreshing the page??");
+	console.log("[YL ReChat] Resynchronization failed, no messages found");
+	this.stopWithoutRemoving();
+	this._showStatusMessage('No chat messages were found past ' + targetTime.toLocaleTimeString() + ':(', 'sad.png');
 };
 
 ReChat.Playback.prototype.start = function(chatConfig) {
@@ -417,7 +422,7 @@ ReChat.Playback.prototype.start = function(chatConfig) {
 	this._emotesFinished = false;
 	this._messagesFinished = false;
 
-	$("#yt-masthead-container").text("YL ReChat is still loading! be patient please");
+	this._showStatusMessage('Loading emotes and messages...');
 
 	this._loadMessages(chatConfig.chatJson, function(data) {
 		that._chatLog = JSON.parse(data);
@@ -427,9 +432,9 @@ ReChat.Playback.prototype.start = function(chatConfig) {
 		});
 		console.log("[YL ReChat] Messages loaded.");
 		if (that._emotesFinished) {
-			$("#yt-masthead-container").text("done loading!!");
+			that._hideStatusMessage();
 		} else {
-			$("#yt-masthead-container").text("message loading has finished, but wait 20 secs or so for emotes to finish");
+			that._showStatusMessage('Messages done, waiting on Emoticons');
 		}
 		that._messagesFinished = true;
 	});
@@ -444,6 +449,14 @@ ReChat.Playback.prototype.stop = function() {
     	this._container.empty();
     	this._container.remove();
   	}
+    this._emoticons = [];
+    this._chatLog = [];
+};
+
+ReChat.Playback.prototype.stopWithoutRemoving = function() {
+	console.log("[YL ReChat] Stopping replay.");
+	this._pop.off("timeupdate");
+    this._container.empty();
     this._emoticons = [];
     this._chatLog = [];
 };
