@@ -143,6 +143,8 @@ ReChat.Playback.prototype._prepareInterface = function() {
 ReChat.Playback.prototype._loadEmoticons = function() {
   var that = this;
   this._emoticons = [];
+  var normalEmotes = [];
+  var specialYogEmotes = [];
   ReChat.get('https://api.twitch.tv/kraken/chat/emoticons', {}, function(result) {
     if (typeof(result) === 'string' && typeof(JSON) !== 'undefined') {
       try {
@@ -152,12 +154,23 @@ ReChat.Playback.prototype._loadEmoticons = function() {
     $.each(result.emoticons, function(i, emoticon) {
       var image = emoticon.images[0];
       if (image.emoticon_set === null) {
-        that._emoticons.push({
-          regex: new RegExp(emoticon.regex, 'g'),
+      	console.log("added " + emoticon.regex);
+        normalEmotes.push({
+          regex: new RegExp(emoticon.regex + "(?![a-z])", 'g'),
+          code: $('<span>').addClass('emoticon').css({ 'background-image': 'url(' + image.url + ')', 'height': image.height, 'width': image.width, 'background-position': 'center center', 'background-repeat': 'no-repeat', 'display': 'inline-block', 'vertical-align:': 'bottom' }).prop('outerHTML').replace(/&quot;/g, "'")
+        });
+      }
+      // super ultra special secret (not really) yogscast subscriber emotes
+      // this does also load some other people's emotes, but meh
+      if (image.emoticon_set === 1497) {
+      	console.log("added " + emoticon.regex);
+        specialYogEmotes.push({
+          regex: new RegExp(emoticon.regex + "(?![a-z])", 'g', 'g'),
           code: $('<span>').addClass('emoticon').css({ 'background-image': 'url(' + image.url + ')', 'height': image.height, 'width': image.width, 'background-position': 'center center', 'background-repeat': 'no-repeat', 'display': 'inline-block', 'vertical-align:': 'bottom' }).prop('outerHTML').replace(/&quot;/g, "'")
         });
       }
     });
+	that._emoticons = $.merge(specialYogEmotes, normalEmotes);
     if (that._messagesFinished) {
 		that._hideStatusMessage();
 	} else {
