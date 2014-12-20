@@ -1,3 +1,6 @@
+// A LOT OF CODE IS UNUSED. Start with the code executed
+// when $(document).ready() to see what is used and unused!
+
 var ReChat = {
   // Settings:
   searchBaseUrl: 'http://search.rechat.org/videos/',
@@ -5,7 +8,7 @@ var ReChat = {
   chatDisplayLimit: 1000,
   loadingDelay: 5000,
   nicknameColors: Please.make_color({ colors_returned: 50, saturation: 0.7 }),
-  defaultStreamDelay: 17,
+  defaultStreamDelay: 20, //default 17
 
   Browser: {
     Safari: 0,
@@ -79,9 +82,9 @@ var ReChat = {
 
 };
 
-ReChat.Playback = function(videoId, recordedAt) {
-  this.videoId = videoId;
-  this.recordedAt = recordedAt;
+ReChat.Playback = function() {
+  //this.videoId = videoId;
+  //this.recordedAt = recordedAt;
   this.streamDelay = ReChat.defaultStreamDelay;
 };
 
@@ -93,7 +96,8 @@ ReChat.Playback.prototype._prepareInterface = function() {
     'bottom': 0,
     'width': '339px',
     'z-index': 4,
-    'background-color': '#f2f2f2'
+    'background-color': '#f2f2f2',
+    'margin-top': '50px'
   }).addClass('rightcol-content');
 
   var statusMessage = $('<div>').css({
@@ -123,7 +127,7 @@ ReChat.Playback.prototype._prepareInterface = function() {
   this._chatMessageContainer = chatMessages;
 
   this._container = container;
-  $('body').append(container);
+  $('#page').append(container);
 
   $('#right_close').click(function() {
     if (!$(this).hasClass('closed')) {
@@ -148,78 +152,33 @@ ReChat.Playback.prototype._loadEmoticons = function() {
       if (image.emoticon_set === null) {
         that._emoticons.push({
           regex: new RegExp(emoticon.regex, 'g'),
-          code: $('<span>').addClass('emoticon').css({ 'background-image': 'url(' + image.url + ')', 'height': image.height, 'width': image.width }).prop('outerHTML').replace(/&quot;/g, "'")
+          code: $('<span>').addClass('emoticon').css({ 'background-image': 'url(' + image.url + ')', 'height': image.height, 'width': image.width, 'background-position': 'center center', 'background-repeat': 'no-repeat', 'display': 'inline-block', 'vertical-align:': 'bottom' }).prop('outerHTML').replace(/&quot;/g, "'")
         });
       }
     });
+    if (that._messagesFinished) {
+		$("#yt-masthead-container").text("done loading!!");
+	} else {
+		$("#yt-masthead-container").text("emoticon loading has finished, but wait a little bit for messages to finish");
+	}
+	that._emotesFinished = true;
+    console.log("[YL ReChat] Emotes have loaded!");
   });
+
 };
 
-ReChat.Playback.prototype._loadMessages = function(recievedAfter, callback) {
+ReChat.Playback.prototype._loadMessages = function(url, callback) {
   var that = this;
-  ReChat.get(ReChat.searchBaseUrl + this.videoId,
-             { 'after': recievedAfter.toISOString() },
+  ReChat.get(url, { },
              callback,
              function() {
                // request failed, let's try again in 5 seconds
                setTimeout(function() {
-                 if (!that._stopped) {
-                   that._loadMessages(recievedAfter, callback);
-                 }
+               	   if (!that._stopped) {
+                  	 that._loadMessages(url, callback);
+         		   }
                }, 5000);
              });
-};
-
-ReChat.Playback.prototype._currentVideoTime = function() {
-  return (parseInt($('body').attr('rechat-video-time')) || 0) + this.streamDelay;
-};
-
-ReChat.Playback.prototype._currentAbsoluteVideoTime = function() {
-  return new Date(+this.recordedAt + this._currentVideoTime() * 1000);
-};
-
-ReChat.Playback.prototype._autoPopulateCache = function(dropExistingCache) {
-  var newestMessageDate = this._newestMessageDate || this._currentAbsoluteVideoTime(),
-      populationId = new Date(),
-      that = this;
-  if (this._messageStreamEndAt && newestMessageDate >= this._messageStreamEndAt) {
-    console.info('No more messages available, aborting...');
-    return;
-  }
-  this._cachePopulationId = populationId;
-  var loadingFunction = function() {
-    console.info('Loading messages from the server that got recordet after ' + newestMessageDate);
-    that._loadMessages(newestMessageDate, function(result) {
-      if (populationId != that._cachePopulationId) {
-        console.info('Population ID changed, lock expired, aborting...');
-        return;
-      }
-      if (!result.hits.total) {
-        that._messageStreamEndAt = newestMessageDate;
-      } else {
-        var hits = result.hits.hits,
-        newestMessage = hits[hits.length - 1];
-        that._newestMessageDate = new Date(newestMessage._source.recieved_at);
-        if (result.hits.total == hits.length) {
-          that._messageStreamEndAt = that._newestMessageDate;
-        }
-        if (dropExistingCache) {
-          that._cachedMessages = hits;
-        } else {
-          Array.prototype.push.apply(that._cachedMessages, hits);
-        }
-      }
-    });
-  };
-
-  if (dropExistingCache) {
-    if (this._loadingTimeout) {
-      clearTimeout(this._loadingTimeout);
-    }
-    this._loadingTimeout = setTimeout(loadingFunction, ReChat.loadingDelay);
-  } else {
-    loadingFunction();
-  }
 };
 
 ReChat.Playback.prototype._showStatusMessage = function(message, statusImage) {
@@ -338,82 +297,209 @@ ReChat.Playback.prototype._replaceEmoticons = function(text) {
   return text;
 };
 
-ReChat.Playback.prototype._formatChatMessage = function(messageData) {
+ReChat.Playback.prototype._formatChatMessage = function(sender, msg) {
   var line = $('<div>').css('padding', '4px').addClass('rechat-chat-line'),
       from = $('<span>').addClass('from').css({
-        'color': this._colorForNickname(messageData.from),
+        'color': this._colorForNickname(sender),
         'font-weight': 'bold'
       }),
       colon = $('<span>').addClass('colon'),
       message = $('<span>').addClass('message');
-  from.text(messageData.from);
+  from.text(sender);
   colon.text(':');
-  message.text(messageData.message);
+  message.text(msg);
   message.html(this._replaceEmoticons(message.html()));
   line.append(from).append(colon).append(' ').append(message);
   return line;
 };
 
-ReChat.Playback.prototype.start = function() {
-  console.info('ReChat: start');
-  this._prepareInterface();
-  this._loadEmoticons();
-  this._replay();
+ReChat.Playback.prototype._formatInfoMessage = function(msg) {
+	var line = $('<div>').css('padding', '4px').addClass('rechat-chat-line'),
+	    message = $('<span>').addClass('from').css({
+	      'color': this._colorForNickname(msg),
+	      'font-weight': 'bold'
+	    });
+	message.text(msg);
+	line.append(message);
+	return line;
+};
+
+ReChat.Playback.prototype._appendMessage = function(msg) {
+	var atBottom = this._scrolledToBottom();
+	this._chatMessageContainer.append(msg);
+	if (atBottom) {
+	  this._scrollToBottom();
+	  var numberOfChatMessagesDisplayed = this._chatMessageContainer.find('.rechat-chat-line').length;
+	  if (numberOfChatMessagesDisplayed >= ReChat.chatDisplayLimit) {
+	    this._chatMessageContainer.find('.rechat-chat-line:lt(' + Math.max(numberOfChatMessagesDisplayed - ReChat.chatDisplayLimit, 10) + ')').remove();
+	  }
+	}
+};
+
+ReChat.Playback.prototype._tick = function() {
+	var sub = ((this._pop.currentTime() * 1000) - (this._lastVideoTime * 1000));
+	if (sub > 6000 || sub < 0) {
+		console.log("time skipped 6 or more seconds or is in the negative, resyncing");
+		this._resync();
+	}
+	this._virtualTime.setMilliseconds(this._virtualTime.getMilliseconds() + sub);
+	//console.log((pop.currentTime() * 1000) + " " + (lastVideoTime * 1000));
+	this._lastVideoTime = this._pop.currentTime();
+
+	$("#yt-masthead-container").text("virtual time: " + this._virtualTime.toLocaleDateString() + " " + this._virtualTime.toLocaleTimeString() + " | " + sub + " | " + this._currentChatMessage);
+
+	while (this._doDatesMatch()) {
+		//console.log("[" + this._virtualTime + "] " + this._chatLog[this._currentChatMessage].sender + ": " + this._chatLog[this._currentChatMessage].message);
+		this._appendMessage(this._formatChatMessage(this._chatLog[this._currentChatMessage].sender, this._chatLog[this._currentChatMessage].message));
+		this._currentChatMessage++;
+	}
+
+};
+
+ReChat.Playback.prototype._doDatesMatch = function() {
+	var c = this._currentChatMessage;
+	// this is a monstrosity, I know :(
+	if ((this._chatLog[c].month - 1) == this._virtualTime.getMonth() && this._chatLog[c].day == this._virtualTime.getDate() && this._chatLog[c].year == this._virtualTime.getFullYear() && this._chatLog[c].hours == this._virtualTime.getHours() && this._chatLog[c].minutes == this._virtualTime.getMinutes() && this._chatLog[c].seconds == this._virtualTime.getSeconds()) {
+		return true;
+	}
+	return false;
+};
+
+ReChat.Playback.prototype._resync = function() {
+	//console.log(this._pop.currentTime());
+	var targetTime = new Date(this._startingVirtualTime.getTime() + (this._pop.currentTime() * 1000));
+	var chatLog = this._chatLog;
+	console.log("targetTime: " + targetTime);
+	for (i = 0; i < chatLog.length; i++) { // this may be /really/ inefficient.
+		var nextDate = new Date(chatLog[i].year, chatLog[i].month - 1, chatLog[i].day, chatLog[i].hours, chatLog[i].minutes, chatLog[i].seconds);
+		if (nextDate > targetTime) {
+			console.log("chosen " + i + ", " + nextDate);
+			this._currentChatMessage = i;
+			this._appendMessage(this._formatInfoMessage("** Chat has been resynchronized **"));
+			return;
+		}
+	}
+	console.log("uh oh, couldn't find anything when resyncing!!");
+	$("#yt-masthead-container").text("there was nothing found when resyncing chat... maybe try again by refreshing the page??");
+};
+
+ReChat.Playback.prototype.start = function(chatConfig) {
+    console.info('[YL ReChat] Starting initialization...');
+
+    var that = this;
+
+   	/*var chatConfig = {
+		"chatJson": "https://dl.dropboxusercontent.com/u/38313036/yoglogs/hakimon%20the%20return%20fixed.json",
+		"day": 10,
+		"month": 12,
+		"year": 2014,
+		"hours": 16,
+		"minutes": 59,
+		"seconds": 11
+	};*/
+	console.info('[YL ReChat] Preparing chat interface...');
+	this._prepareInterface();
+
+	console.log("[YL ReChat] Loading emoticons...");
+  	this._loadEmoticons();
+
+	console.log("[YL ReChat] Attaching to YouTube player...");
+	$(".html5-main-video").attr("id", "ytvideo");
+	this._pop = Popcorn('#ytvideo');
+ 	this._pop.autoplay(false);
+  	this._pop.pause();
+
+// year, month, day
+	this._startingVirtualTime = new Date(chatConfig.year, chatConfig.month - 1, chatConfig.day, chatConfig.hours, chatConfig.minutes, chatConfig.seconds + this.streamDelay);
+	this._virtualTime = new Date(this._startingVirtualTime.getTime());
+	this._currentChatMessage = 0;
+	this._lastVideoTime = 0;
+	this._emotesFinished = false;
+	this._messagesFinished = false;
+
+	$("#yt-masthead-container").text("YL ReChat is still loading! be patient please");
+
+	this._loadMessages(chatConfig.chatJson, function(data) {
+		that._chatLog = JSON.parse(data);
+		that._resync();
+		that._pop.on("timeupdate", function() {
+			that._tick();
+		});
+		console.log("[YL ReChat] Messages loaded.");
+		if (that._emotesFinished) {
+			$("#yt-masthead-container").text("done loading!!");
+		} else {
+			$("#yt-masthead-container").text("message loading has finished, but wait 20 secs or so for emotes to finish");
+		}
+		that._messagesFinished = true;
+	});
+
+  //this._replay();
 };
 
 ReChat.Playback.prototype.stop = function() {
-  this._stopped = true;
-  if (this._loadingTimeout) {
-    clearTimeout(this._loadingTimeout);
-  }
-  if (this._container) {
-    this._container.empty();
-    this._container.remove();
-  }
-  this._emoticons = [];
-  this._cachedMessages = [];
+	console.log("[YL ReChat] Stopping replay.");
+	this._pop.off("timeupdate");
+	if (this._container) {
+    	this._container.empty();
+    	this._container.remove();
+  	}
+    this._emoticons = [];
+    this._chatLog = [];
 };
 
-$(document).ready(function() {
-  if (window.top !== window) {
-    return;
-  }
-  var lastUrl = false,
-      currentPlayback = false;
-  // TODO: find a better solution for this...
-  setInterval(function() {
-    var currentUrl = document.location.href;
-    if (lastUrl === false) {
-      var ogVideoTag = $('meta[property="og:video"]');
-      if (ogVideoTag.length && $('div.archive_info_title').length && $('div#player object').length) {
-        var videoUrl = ogVideoTag.attr('content'),
-            videoIdRegex = /videoId=([a-z0-9]+)/,
-            match = videoIdRegex.exec(videoUrl);
-        if (match != null) {
-          var videoId = match[1];
-          console.info('VOD ' + videoId + ' detected');
-          ReChat.get('https://api.twitch.tv/kraken/videos/' + videoId, {}, function(result) {
-            if (currentUrl != document.location.href) {
-              return;
-            }
-            var recordedAt = new Date(Date.parse(result.recorded_at));
-            currentPlayback = new ReChat.Playback(videoId, recordedAt);
-            currentPlayback.start();
-          });
+// https://api.twitch.tv/kraken/videos/
 
-          // Inject script to extract video time
-          var script = document.createElement('script');
-          script.src = ReChat.getExtensionResourcePath('js/injected.js');
-          document.documentElement.appendChild(script);
-        }
-      }
-      lastUrl = currentUrl;
-    } else if(lastUrl != currentUrl) {
-      if (currentPlayback) {
-        currentPlayback.stop();
-        currentPlayback = false;
-      }
-      lastUrl = false;
-    }
-  }, 1000);
+$(document).ready(function() {
+
+	if ($('meta[itemprop="channelId"]').attr("content") != "UCQBs359lwzyVFtc22LzLjuw") {
+		console.log("[YL ReChat] Not a YogsLive video, not continuing with init.");
+		return;
+	}
+
+	var id = $('meta[itemprop="videoId"]').attr('content');
+	console.log("[YL ReChat] Loading chat configuration for video " + id + "...");
+	ReChat.get('https://expertmac2.pancakeapps.com/rechat/config/' + id + ".json", {}, function(result) {
+		//var json = JSON.parse(result);
+		new ReChat.Playback().start(result);
+  	}, function() {
+  		console.log("[YL ReChat] No chat configuration found for " + id + ", not continuing with init.");
+  	});
+
+	/*
+
+	For emoticon testing
+
+	setTimeout(function() {
+	 rechat._chatMessageContainer.append(rechat._formatChatMessage({
+	 	"message": "hello Kappa",
+	 	"from": "someguy"
+	 }));
+	  rechat._chatMessageContainer.append(rechat._formatChatMessage({
+	 	"message": "hello yogC yogCat yogD yogDad yogDrew yogEat",
+	 	"from": "someguy"
+	 }));
+	   rechat._chatMessageContainer.append(rechat._formatChatMessage({
+	 	"message": "hello yogGG yogGame yogGin yogGreet yogH yogHype",
+	 	"from": "someguy"
+	 }));
+	    rechat._chatMessageContainer.append(rechat._formatChatMessage({
+	 	"message": "hello yogJazz yogK yogKappa yogL yogLmano yogLove",
+	 	"from": "someguy"
+	 }));
+	 rechat._chatMessageContainer.append(rechat._formatChatMessage({
+	 	"message": "hello yogM yogMLG yogMad yogMagic yogO yogPlay",
+	 	"from": "someguy"
+	 }));
+	 rechat._chatMessageContainer.append(rechat._formatChatMessage({
+	 	"message": "hello yogPog yogRIP yogRage yogRekt yogRxZ yogS",
+	 	"from": "someguy"
+	 }));
+	 rechat._chatMessageContainer.append(rechat._formatChatMessage({
+	 	"message": "hello yogSips yogTNT yogThump yogW yogWot",
+	 	"from": "someguy"
+	 }));
+	}, 0);
+	*/
+
 });

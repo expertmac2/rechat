@@ -1,10 +1,10 @@
 {
   "manifest_version": 2,
 
-  "name": "ReChat for Twitch™",
-  "short_name": "ReChat",
-  "description": "Adds chat messages from the past to your favorite Twitch VODs.",
-  "author": "Nils Caspar",
+  "name": "ReChat for YogscastLive",
+  "short_name": "YogsLive ReChat",
+  "description": "Adds chat messages from the past to YogscastLive VODs.",
+  "author": "Nils Caspar, expertmac2",
   "homepage_url": "http://www.rechat.org/",
   "version": "0.8.2",
 
@@ -16,16 +16,18 @@
   },
 
   "permissions": [
-    "http://www.twitch.tv/",
     "https://api.twitch.tv/kraken/",
-    "http://*.rechat.org/"
+    "https://youtube.com/",
+    "https://expertmac2.pancakeapps.com/",
+    "https://dl.dropboxusercontent.com/u/38313036/yoglogs/*"
   ],
-  "content_security_policy": "script-src 'self' https://api.twitch.tv/; object-src 'self'",
+
+  "content_security_policy": "script-src 'self' https://api.twitch.tv/ https://dl.dropboxusercontent.com/ https://expertmac2.pancakeapps.com/; object-src 'self' https://expertmac2.pancakeapps.com/;",
 
   "content_scripts": [
     {
-      "matches": ["http://www.twitch.tv/*"],
-      "js": ["js/jquery.min.js", "js/please.js", "js/rechat.js"]
+      "matches": ["https://www.youtube.com/*"],
+      "js": ["js/jquery.min.js", "js/please.js", "js/popcorn-complete.min.js", "js/rechat.js"]
     }
   ],
 
