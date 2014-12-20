@@ -170,7 +170,7 @@ ReChat.Playback.prototype._loadEmoticons = function() {
         });
       }
     });
-	that._emoticons = $.merge(specialYogEmotes, normalEmotes);
+	that._emoticons = $.merge(specialYogEmotes, normalEmotes); // yog emotes should take priority over normal twitch emotes
     if (that._messagesFinished) {
 		that._hideStatusMessage();
 	} else {
@@ -381,7 +381,6 @@ ReChat.Playback.prototype._doDatesMatch = function() {
 };
 
 ReChat.Playback.prototype._resync = function() {
-	//console.log(this._pop.currentTime());
 	this._showStatusMessage('Resynchronizing the chat...');
 	var targetTime = new Date(this._startingVirtualTime.getTime() + (this._pop.currentTime() * 1000));
 	var chatLog = this._chatLog;
@@ -418,6 +417,8 @@ ReChat.Playback.prototype.start = function(chatConfig) {
 	console.info('[YL ReChat] Preparing chat interface...');
 	this._prepareInterface();
 
+	this._showStatusMessage('Loading...');
+
 	console.log("[YL ReChat] Loading emoticons...");
   	this._loadEmoticons();
 
@@ -427,7 +428,7 @@ ReChat.Playback.prototype.start = function(chatConfig) {
  	this._pop.autoplay(false);
   	this._pop.pause();
 
-// year, month, day
+	console.log("[YL ReChat] Initializing a bunch of variables that will be used later...");
 	this._startingVirtualTime = new Date(chatConfig.year, chatConfig.month - 1, chatConfig.day, chatConfig.hours, chatConfig.minutes, chatConfig.seconds + this.streamDelay);
 	this._virtualTime = new Date(this._startingVirtualTime.getTime());
 	this._currentChatMessage = 0;
@@ -435,8 +436,7 @@ ReChat.Playback.prototype.start = function(chatConfig) {
 	this._emotesFinished = false;
 	this._messagesFinished = false;
 
-	this._showStatusMessage('Loading emotes and messages...');
-
+	console.log("[YL ReChat] Loading messages...");
 	this._loadMessages(chatConfig.chatJson, function(data) {
 		that._chatLog = JSON.parse(data);
 		that._resync();
@@ -486,46 +486,9 @@ $(document).ready(function() {
 	var id = $('meta[itemprop="videoId"]').attr('content');
 	console.log("[YL ReChat] Loading chat configuration for video " + id + "...");
 	ReChat.get('https://expertmac2.pancakeapps.com/rechat/config/' + id + ".json", {}, function(result) {
-		//var json = JSON.parse(result);
 		new ReChat.Playback().start(result);
   	}, function() {
   		console.log("[YL ReChat] No chat configuration found for " + id + ", not continuing with init.");
   	});
-
-	/*
-
-	For emoticon testing
-
-	setTimeout(function() {
-	 rechat._chatMessageContainer.append(rechat._formatChatMessage({
-	 	"message": "hello Kappa",
-	 	"from": "someguy"
-	 }));
-	  rechat._chatMessageContainer.append(rechat._formatChatMessage({
-	 	"message": "hello yogC yogCat yogD yogDad yogDrew yogEat",
-	 	"from": "someguy"
-	 }));
-	   rechat._chatMessageContainer.append(rechat._formatChatMessage({
-	 	"message": "hello yogGG yogGame yogGin yogGreet yogH yogHype",
-	 	"from": "someguy"
-	 }));
-	    rechat._chatMessageContainer.append(rechat._formatChatMessage({
-	 	"message": "hello yogJazz yogK yogKappa yogL yogLmano yogLove",
-	 	"from": "someguy"
-	 }));
-	 rechat._chatMessageContainer.append(rechat._formatChatMessage({
-	 	"message": "hello yogM yogMLG yogMad yogMagic yogO yogPlay",
-	 	"from": "someguy"
-	 }));
-	 rechat._chatMessageContainer.append(rechat._formatChatMessage({
-	 	"message": "hello yogPog yogRIP yogRage yogRekt yogRxZ yogS",
-	 	"from": "someguy"
-	 }));
-	 rechat._chatMessageContainer.append(rechat._formatChatMessage({
-	 	"message": "hello yogSips yogTNT yogThump yogW yogWot",
-	 	"from": "someguy"
-	 }));
-	}, 0);
-	*/
 
 });
