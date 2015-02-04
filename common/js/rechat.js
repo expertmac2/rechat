@@ -469,9 +469,6 @@ ReChat.Playback.prototype.stopWithoutRemoving = function() {
     this._container.empty();
     this._emoticons = {};
     this._chatLog = [];
-    if (this._observer) {
-        this._observer.disconnect();
-    }
 };
 
 // https://api.twitch.tv/kraken/videos/
