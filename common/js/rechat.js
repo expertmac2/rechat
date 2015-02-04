@@ -130,31 +130,6 @@ ReChat.Playback.prototype._prepareInterface = function() {
   $('#page').append(container);
 
   $('#watch-header').after('<div id="rechat-information" class="yt-card yt-card-has-padding">Video not playing...</div>');
-
-  var rightCol = $('#right_col'),
-      resizeCallback = function(mutations) {
-        var styleChanged = false;
-        if (mutations) {
-          mutations.forEach(function(mutation) {
-            styleChanged = styleChanged ||
-              (mutation.attributeName == 'style' && mutation.oldValue != rightCol.attr('style')) ||
-              (mutation.attributeName == 'class' && mutation.oldValue != rightCol.attr('class'));
-          });
-        } else {
-          styleChanged = true;
-        }
-        if (styleChanged) {
-          if (rightCol.is(':visible')) {
-            container.show();
-            container.width(rightCol.width() - 1);
-          } else {
-            container.hide();
-          }
-        }
-      };
-  resizeCallback();
-  this._observer = new MutationObserver(resizeCallback);
-  this._observer.observe(rightCol[0], { subtree: false, attributes: true, attributeOldValue: true });
 };
 
 ReChat.Playback.prototype._loadEmoticons = function() {
@@ -492,7 +467,7 @@ ReChat.Playback.prototype.stopWithoutRemoving = function() {
 	console.log("[YL ReChat] Stopping replay.");
 	this._pop.off("timeupdate");
     this._container.empty();
-    this._emoticons = [];
+    this._emoticons = {};
     this._chatLog = [];
     if (this._observer) {
         this._observer.disconnect();
