@@ -1,5 +1,5 @@
 // A LOT OF CODE IS UNUSED. Start with the code executed
-// when $(document).ready() to see what is used and unused!
+// in $(document).ready() to see what is used and unused!
 
 var ReChat = {
   // Settings:
@@ -55,8 +55,8 @@ var ReChat = {
             handler = function(event) {
               if(event.name == uuid) {
                 safari.self.removeEventListener('message', handler);
-                if(event.message == 'error') {
-                  failure && failure();
+                if(!event.message || event.message.error) {
+                  failure && failure(event.message);
                 } else {
                   success(event.message);
                 }
@@ -131,20 +131,35 @@ ReChat.Playback.prototype._prepareInterface = function() {
 
   $('#watch-header').after('<div id="rechat-information" class="yt-card yt-card-has-padding">Video not playing...</div>');
 
-  $('#right_close').click(function() {
-    if (!$(this).hasClass('closed')) {
-      container.hide();
-    } else {
-      container.show();
-    }
-  });
+  var rightCol = $('#right_col'),
+      resizeCallback = function(mutations) {
+        var styleChanged = false;
+        if (mutations) {
+          mutations.forEach(function(mutation) {
+            styleChanged = styleChanged ||
+              (mutation.attributeName == 'style' && mutation.oldValue != rightCol.attr('style')) ||
+              (mutation.attributeName == 'class' && mutation.oldValue != rightCol.attr('class'));
+          });
+        } else {
+          styleChanged = true;
+        }
+        if (styleChanged) {
+          if (rightCol.is(':visible')) {
+            container.show();
+            container.width(rightCol.width() - 1);
+          } else {
+            container.hide();
+          }
+        }
+      };
+  resizeCallback();
+  this._observer = new MutationObserver(resizeCallback);
+  this._observer.observe(rightCol[0], { subtree: false, attributes: true, attributeOldValue: true });
 };
 
 ReChat.Playback.prototype._loadEmoticons = function() {
   var that = this;
-  this._emoticons = [];
-  var normalEmotes = [];
-  var specialYogEmotes = [];
+  this._emoticons = {};
   ReChat.get('https://api.twitch.tv/kraken/chat/emoticons', {}, function(result) {
     if (typeof(result) === 'string' && typeof(JSON) !== 'undefined') {
       try {
@@ -153,22 +168,13 @@ ReChat.Playback.prototype._loadEmoticons = function() {
     }
     $.each(result.emoticons, function(i, emoticon) {
       var image = emoticon.images[0];
-      if (image.emoticon_set === null) {
-      	console.log("added " + emoticon.regex);
-        normalEmotes.push({
-          regex: new RegExp(emoticon.regex + "(?![a-z])", 'g'),
-          code: $('<span>').addClass('emoticon').css({ 'background-image': 'url(' + image.url + ')', 'height': image.height, 'width': image.width, 'background-position': 'center center', 'background-repeat': 'no-repeat', 'display': 'inline-block', 'vertical-align:': 'bottom' }).prop('outerHTML').replace(/&quot;/g, "'")
-        });
+      if (!that._emoticons[image.emoticon_set]) {
+        that._emoticons[image.emoticon_set] = [];
       }
-      // super ultra special secret (not really) yogscast subscriber emotes
-      // this does also load some other people's emotes, but meh
-      if (image.emoticon_set === 1497) {
-      	console.log("added " + emoticon.regex);
-        specialYogEmotes.push({
-          regex: new RegExp(emoticon.regex + "(?![a-z])", 'g', 'g'),
-          code: $('<span>').addClass('emoticon').css({ 'background-image': 'url(' + image.url + ')', 'height': image.height, 'width': image.width, 'background-position': 'center center', 'background-repeat': 'no-repeat', 'display': 'inline-block', 'vertical-align:': 'bottom' }).prop('outerHTML').replace(/&quot;/g, "'")
-        });
-      }
+      that._emoticons[image.emoticon_set].push({
+        regex: new RegExp(emoticon.regex, 'g'),
+        code: $('<span>').addClass('emoticon').css({ 'background-image': 'url(' + image.url + ')', 'height': image.height, 'width': image.width }).prop('outerHTML').replace(/&quot;/g, "'")
+      });
     });
 	that._emoticons = $.merge(specialYogEmotes, normalEmotes); // yog emotes should take priority over normal twitch emotes
     if (that._messagesFinished) {
@@ -293,7 +299,15 @@ ReChat.Playback.prototype._replay = function() {
   }
 };
 
-ReChat.Playback.prototype._colorForNickname = function(nickname) {
+ReChat.Playback.prototype._colorForNickname = function(nickname, usercolor) {
+  if (usercolor) {
+    return '#' + ('000000' + usercolor.toString(16)).slice(-6);
+  } else {
+    return this._generateColorForNickname(nickname);
+  }
+};
+
+ReChat.Playback.prototype._generateColorForNickname = function(nickname) {
   var hash = 0, i, chr, len;
   if (nickname.length == 0) return hash;
   for (i = 0, len = nickname.length; i < len; i++) {
@@ -305,9 +319,17 @@ ReChat.Playback.prototype._colorForNickname = function(nickname) {
   return ReChat.nicknameColors[hash % (ReChat.nicknameColors.length - 1)];
 };
 
-ReChat.Playback.prototype._replaceEmoticons = function(text) {
-  $.each(this._emoticons, function(i, emoticon) {
-    text = text.replace(emoticon.regex, emoticon.code);
+ReChat.Playback.prototype._replaceEmoticons = function(text, emoticon_set) {
+  var that = this;
+  if (!emoticon_set) {
+    emoticon_set = [];
+  }
+  $.each(emoticon_set.concat([null]), function(i, emoticon_set_id) {
+    if (that._emoticons[emoticon_set_id]) {
+      $.each(that._emoticons[emoticon_set_id], function(j, emoticon) {
+        text = text.replace(emoticon.regex, emoticon.code);
+      });
+    }
   });
   return text;
 };
@@ -315,15 +337,15 @@ ReChat.Playback.prototype._replaceEmoticons = function(text) {
 ReChat.Playback.prototype._formatChatMessage = function(sender, msg) {
   var line = $('<div>').css('padding', '4px').addClass('rechat-chat-line'),
       from = $('<span>').addClass('from').css({
-        'color': this._colorForNickname(sender),
+        'color': this._colorForNickname(messageData.from, messageData.usercolor),
         'font-weight': 'bold'
       }),
       colon = $('<span>').addClass('colon'),
       message = $('<span>').addClass('message');
   from.text(sender);
   colon.text(':');
-  message.text(msg);
-  message.html(this._replaceEmoticons(message.html()));
+  message.text(messageData.message);
+  message.html(this._replaceEmoticons(message.html(), messageData.emoteset));
   line.append(from).append(colon).append(' ').append(message);
   return line;
 };
@@ -472,6 +494,9 @@ ReChat.Playback.prototype.stopWithoutRemoving = function() {
     this._container.empty();
     this._emoticons = [];
     this._chatLog = [];
+    if (this._observer) {
+        this._observer.disconnect();
+    }
 };
 
 // https://api.twitch.tv/kraken/videos/
